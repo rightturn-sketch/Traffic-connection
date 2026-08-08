@@ -854,6 +854,83 @@
     return parts.length ? parts.join('、') : '無';
   }
 
+  // ---------- Flex Message（卡片式收據，傳到 LINE 會變成美化卡片）----------
+  function flexRow(label, value, opts){
+    opts = opts || {};
+    return {
+      type: "box",
+      layout: "baseline",
+      spacing: "sm",
+      contents: [
+        { type:"text", text: label, color:"#8B94A7", size:"sm", flex:2 },
+        { type:"text", text: (value || '—'), color: opts.highlight ? "#FFB454" : "#EDEFF5",
+          size:"sm", flex:5, align:"end", wrap:true, weight: opts.highlight ? "bold" : "regular" }
+      ]
+    };
+  }
+  function flexSeparator(){
+    return { type:"separator", color:"#233252", margin:"lg" };
+  }
+
+  function buildFlexMessage(){
+    const pickupText = shortLocation('p');
+    const dropoffText = shortLocation('d');
+    const vehicleLabel = VEHICLE_LABELS[formData.vehicleType] || formData.vehicleType || '未選擇';
+
+    const bodyContents = [
+      flexRow("姓名", formData.name),
+      flexRow("電話", formData.phone),
+      flexRow("用車時間", (formData.date || '') + ' ' + (formData.time || '')),
+      flexSeparator(),
+      flexRow("上車", pickupText),
+      flexRow("下車", dropoffText),
+      flexSeparator(),
+      flexRow("人數", (formData.pax || 1) + " 人"),
+      flexRow("行李", luggageTotal() + " 件（" + luggageText() + "）"),
+      flexRow("車輛類型", vehicleLabel),
+      flexRow("附加服務", addonsText()),
+      flexSeparator(),
+      flexRow("車資", "請洽客服報價", { highlight: true })
+    ];
+
+    return {
+      type: "flex",
+      altText: "交通接駁預約｜" + (formData.name || '') + '｜' + (formData.date || '') + ' ' + (formData.time || ''),
+      contents: {
+        type: "bubble",
+        header: {
+          type: "box",
+          layout: "vertical",
+          backgroundColor: "#FFB454",
+          paddingAll: "20px",
+          contents: [
+            { type:"text", text:"交通接駁預約", weight:"bold", size:"xl", color:"#1A1300" },
+            { type:"text", text:"定點接送", size:"sm", color:"#5C4212", margin:"sm" }
+          ]
+        },
+        body: {
+          type: "box",
+          layout: "vertical",
+          backgroundColor: "#111C30",
+          paddingAll: "20px",
+          spacing: "md",
+          contents: bodyContents
+        },
+        footer: {
+          type: "box",
+          layout: "vertical",
+          backgroundColor: "#111C30",
+          paddingAll: "16px",
+          contents: [
+            flexSeparator(),
+            { type:"text", text:"由交通接駁預約系統送出", size:"xxs", color:"#8B94A7", align:"center", margin:"lg" }
+          ]
+        }
+      }
+    };
+  }
+
+  // 純文字版本保留給「複製文字」按鈕與非 LIFF 環境的分享視窗使用
   function buildMessage(){
     const pickupText = shortLocation('p');
     const dropoffText = shortLocation('d');
@@ -882,12 +959,13 @@
   }
 
   async function sendToLine(){
-    const text = buildMessage();
+    const flexMsg = buildFlexMessage();
+    const text = buildMessage(); // 備援用純文字（LINE 分享網址不支援 Flex，只能傳文字）
     try {
       if (typeof liff !== 'undefined' && liff.isInClient()) {
         // sendMessages 需要 LIFF App 開啟 chat_message.write 權限，
         // 若權限未開啟或尚未登入，會拋出錯誤，此時自動退回分享視窗，避免使用者卡住無法送出
-        await liff.sendMessages([{ type: 'text', text: text }]);
+        await liff.sendMessages([flexMsg]);
         liff.closeWindow();
       } else {
         shareViaUrl(text);
