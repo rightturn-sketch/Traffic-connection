@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>交通接駁預約系統</title>
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0B1220;
+    --bg-panel:#111C30;
+    --bg-elev:#17233A;
+    --border:#233252;
+    --text:#EDEFF5;
+    --muted:#8B94A7;
+    --amber:#FFB454;
+    --amber-dim:#C98A3A;
+    --teal:#2DD4BF;
+    --danger:#FF7A7A;
+    --radius:14px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(ellipse 900px 500px at 50% -10%, rgba(255,180,84,0.08), transparent 60%),
+      var(--bg);
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+    display:flex;
+    justify-content:center;
+    padding:28px 14px 60px;
+    -webkit-font-smoothing:antialiased;
+  }
+  .app{ width:100%; max-width:480px; }
+  .brand{ display:flex; align-items:center; gap:10px; margin-bottom:22px; }
+  .brand-mark{
+    width:38px;height:38px;border-radius:10px;
+    background:linear-gradient(135deg, var(--amber), var(--amber-dim));
+    display:flex;align-items:center;justify-content:center;
+    font-size:18px; flex-shrink:0;
+    box-shadow:0 4px 14px rgba(255,180,84,0.25);
+  }
+  .brand h1{ font-family:'Space Grotesk',sans-serif; font-size:18px; font-weight:700; margin:0; letter-spacing:0.2px; }
+  .brand p{ margin:1px 0 0; font-size:12px; color:var(--muted); letter-spacing:0.5px; }
+
+  .progress-wrap{margin-bottom:24px;}
+  .progress-track{ display:flex; gap:5px; margin-bottom:9px; }
+  .progress-seg{ flex:1; height:4px; border-radius:3px; background:var(--border); overflow:hidden; }
+  .progress-seg i{ display:block; height:100%; width:0%; background:linear-gradient(90deg, var(--amber-dim), var(--amber)); transition:width .35s ease; }
+  .progress-label{ font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--amber); letter-spacing:0.5px; }
+  .progress-label span{color:var(--muted);}
+
+  .card{ background:var(--bg-panel); border:1px solid var(--border); border-radius:var(--radius); padding:24px 20px; }
+
+  .step{display:none;}
+  .step.active{display:block; animation:slideIn .3s ease;}
+  @keyframes slideIn{ from{opacity:0; transform:translateX(10px);} to{opacity:1; transform:translateX(0);} }
+
+  .step-eyebrow{ font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--teal); letter-spacing:1px; margin-bottom:4px; }
+  .step-title{ font-family:'Space Grotesk',sans-serif; font-size:20px; font-weight:600; margin:0 0 18px; }
+
+  .field{margin-bottom:16px;}
+  .field label{ display:block; font-size:13px; color:var(--muted); margin-bottom:6px; font-weight:500; }
+  .row-2{display:flex; gap:10px;}
+  .row-2 .field{flex:1;}
+
+  input[type=text], input[type=tel], input[type=date], input[type=time], input[type=number], select{
+    width:100%; background:var(--bg-elev); border:1px solid var(--border); color:var(--text);
+    padding:12px 12px; border-radius:10px; font-size:15px; font-family:'Inter',sans-serif;
+    outline:none; transition:border-color .15s ease; appearance:none; -webkit-appearance:none;
+  }
+  select{
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='9'><path d='M1 1l6 6 6-6' stroke='%238B94A7' stroke-width='1.6' fill='none' fill-rule='evenodd'/></svg>");
+    background-repeat:no-repeat; background-position:right 12px center; padding-right:32px;
+  }
+  input:focus, select:focus{ border-color:var(--amber); box-shadow:0 0 0 3px rgba(255,180,84,0.12); }
+  input::placeholder{color:#5C6478;}
+
+  .pill-group{display:flex; flex-wrap:wrap; gap:8px;}
+  .pill{
+    padding:9px 14px; border-radius:20px; border:1px solid var(--border); background:var(--bg-elev);
+    color:var(--muted); font-size:13px; cursor:pointer; user-select:none; transition:all .15s ease;
+  }
+  .pill.selected{ background:rgba(255,180,84,0.12); border-color:var(--amber); color:var(--amber); font-weight:600; }
+
+  .subfield{ display:none; margin-top:12px; padding:14px; background:var(--bg-elev); border:1px solid var(--border); border-radius:12px; }
+  .subfield.show{display:block;}
+
+  .vehicle-card{
+    border:1px solid var(--border); background:var(--bg-elev); border-radius:12px; padding:12px 14px;
+    margin-bottom:9px; cursor:pointer; transition:all .15s ease; display:flex; justify-content:space-between; align-items:center;
+  }
+  .vehicle-card.selected{ border-color:var(--teal); background:rgba(45,212,191,0.08); }
+  .vehicle-card .vname{font-weight:600; font-size:14px;}
+  .vehicle-card .vdesc{font-size:12px; color:var(--muted); margin-top:2px;}
+  .vehicle-card .vprice{font-family:'IBM Plex Mono',monospace; color:var(--amber); font-size:13px; white-space:nowrap;}
+
+  /* luggage steppers */
+  .lug-row{
+    display:flex; align-items:center; justify-content:space-between;
+    border:1px solid var(--border); background:var(--bg-elev); border-radius:12px;
+    padding:11px 14px; margin-bottom:8px; transition:border-color .15s ease;
+  }
+  .lug-row.active{border-color:var(--amber);}
+  .lug-name{font-size:14px; font-weight:500;}
+  .lug-stepper{display:flex; align-items:center; gap:10px;}
+  .lug-btn{
+    width:28px; height:28px; border-radius:8px; border:1px solid var(--border); background:var(--bg-panel);
+    color:var(--text); font-size:16px; display:flex; align-items:center; justify-content:center; cursor:pointer; padding:0;
+  }
+  .lug-btn:hover{border-color:var(--amber);}
+  .lug-count{ font-family:'IBM Plex Mono',monospace; font-size:15px; min-width:18px; text-align:center; }
+
+  .error-text{ color:var(--danger); font-size:12px; margin-top:8px; display:none; }
+  .error-text.show{display:block;}
+
+  .nav-row{ display:flex; justify-content:space-between; gap:10px; margin-top:22px; }
+  button{ font-family:'Inter',sans-serif; font-weight:600; font-size:14px; border:none; border-radius:10px; padding:13px 20px; cursor:pointer; transition:opacity .15s ease, transform .1s ease; }
+  button:active{transform:scale(0.98);}
+  .btn-primary{ background:var(--amber); color:#1A1300; flex:1; }
+  .btn-primary:hover{opacity:0.92;}
+  .btn-ghost{ background:transparent; color:var(--muted); border:1px solid var(--border); }
+  .btn-ghost:hover{color:var(--text);}
+  .btn-ghost.hidden{visibility:hidden;}
+
+  .pass{ position:relative; background:linear-gradient(180deg, #16223A, #101A2C); border:1px solid var(--border); border-radius:16px; overflow:hidden; margin-bottom:18px; }
+  .pass-top{ padding:18px 18px 14px; }
+  .pass-route{ display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; gap:8px;}
+  .pass-route .airport{ font-family:'Space Grotesk',sans-serif; font-size:17px; font-weight:700; line-height:1.25;}
+  .pass-route .sub{font-size:11px; color:var(--muted); letter-spacing:0.5px; margin-top:2px;}
+  .pass-route .plane{color:var(--amber); font-size:18px; flex-shrink:0;}
+  .pass-route .dest{text-align:right;}
+
+  .pass-grid{ display:grid; grid-template-columns:1fr 1fr; gap:14px 10px; }
+  .pass-item .k{ font-size:10px; color:var(--muted); letter-spacing:1px; margin-bottom:3px; font-family:'IBM Plex Mono',monospace; }
+  .pass-item .v{ font-size:14px; font-weight:600; }
+  .pass-item .v.mono{font-family:'IBM Plex Mono',monospace;}
+  .pass-item.full{grid-column:1 / -1;}
+
+  .pass-tear{ position:relative; height:0; border-top:2px dashed var(--border); margin:16px 0 0; }
+  .pass-tear::before, .pass-tear::after{ content:""; position:absolute; top:-9px; width:18px;height:18px; border-radius:50%; background:var(--bg); }
+  .pass-tear::before{left:-27px;} .pass-tear::after{right:-27px;}
+
+  .pass-bottom{ padding:16px 18px 18px; display:flex; justify-content:space-between; align-items:center; }
+  .barcode{ height:34px; width:90px; background:repeating-linear-gradient(90deg, var(--muted) 0 2px, transparent 2px 4px, var(--muted) 4px 5px, transparent 5px 9px, var(--muted) 9px 12px, transparent 12px 14px); opacity:0.55; }
+
+  .send-row{display:flex; flex-direction:column; gap:10px;}
+  .btn-line{ background:#06C755; color:#fff; display:flex; align-items:center; justify-content:center; gap:8px; font-size:15px; }
+  .btn-copy{ background:transparent; border:1px solid var(--border); color:var(--muted); }
+  .toast{ text-align:center; font-size:12px; color:var(--teal); margin-top:10px; opacity:0; transition:opacity .3s ease; }
+  .toast.show{opacity:1;}
+  .note{ font-size:11px; color:var(--muted); text-align:center; margin-top:16px; line-height:1.6; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="brand">
+    <div class="brand-mark">🚐</div>
+    <div>
+      <h1>交通接駁預約系統</h1>
+      <p>TRANSPORT BOOKING · 線上一步一步預約</p>
+    </div>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-track" id="progressTrack"></div>
+    <div class="progress-label"><span id="stepIndex">01</span> / 08　<span id="stepName">聯絡資訊</span></div>
+  </div>
+
+  <div class="card">
+
+    <!-- STEP 0: contact -->
+    <div class="step active" data-step="0">
+      <div class="step-eyebrow">STEP 01</div>
+      <div class="step-title">聯絡資訊</div>
+      <div class="field">
+        <label>姓名</label>
+        <input type="text" id="f-name" placeholder="請輸入乘客姓名">
+      </div>
+      <div class="field">
+        <label>聯絡電話</label>
+        <input type="tel" id="f-phone" placeholder="請輸入手機號碼，例如 0912345678">
+      </div>
+      <div class="error-text" id="err-0">請完整填寫姓名與電話（電話至少 8 碼）。</div>
+    </div>
+
+    <!-- STEP 1: date/time -->
+    <div class="step" data-step="1">
+      <div class="step-eyebrow">STEP 02</div>
+      <div class="step-title">用車日期與時間</div>
+      <div class="field">
+        <label>用車日期</label>
+        <input type="date" id="f-date">
+      </div>
+      <div class="field">
+        <label>用車時間</label>
+        <input type="time" id="f-time">
+      </div>
+      <div class="error-text" id="err-1">請選擇日期與時間（日期需為今天以後）。</div>
+    </div>
+
+    <!-- STEP 2: pickup location -->
+    <div class="step" data-step="2">
+      <div class="step-eyebrow">STEP 03</div>
+      <div class="step-title">上車地點</div>
+      <div id="pickupFields"></div>
+      <div class="error-text" id="err-2">請完整填寫上車地點資訊。</div>
+    </div>
+
+    <!-- STEP 3: dropoff location -->
+    <div class="step" data-step="3">
+      <div class="step-eyebrow">STEP 04</div>
+      <div class="step-title">下車地點</div>
+      <div id="dropoffFields"></div>
+      <div class="error-text" id="err-3">請完整填寫下車地點資訊。</div>
+    </div>
+
+    <!-- STEP 4: pax / luggage -->
+    <div class="step" data-step="4">
+      <div class="step-eyebrow">STEP 05</div>
+      <div class="step-title">人數與行李</div>
+      <div class="field">
+        <label>搭乘人數</label>
+        <select id="f-pax">
+          <option value="">請選擇</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>行李尺寸與數量（可複選，選填）</label>
+        <div id="luggageStepperGroup"></div>
+      </div>
+      <div class="error-text" id="err-4">請選擇搭乘人數。</div>
+    </div>
+
+    <!-- STEP 5: vehicle -->
+    <div class="step" data-step="5">
+      <div class="step-eyebrow">STEP 06</div>
+      <div class="step-title">選擇車輛</div>
+      <div class="field" style="margin-bottom:0;">
+        <label>車型</label>
+        <div id="vehicleTypeGroup"></div>
+      </div>
+      <div class="error-text" id="err-5">請選擇車型。</div>
+    </div>
+
+    <!-- STEP 6: addons -->
+    <div class="step" data-step="6">
+      <div class="step-eyebrow">STEP 07</div>
+      <div class="step-title">附加服務（可複選）</div>
+      <div class="field">
+        <label>座椅加購（可選數量，NT$200／個）</label>
+        <div id="addonStepperGroup"></div>
+      </div>
+      <div class="field" style="margin-bottom:0;">
+        <label>免費偏好設定</label>
+        <div class="pill-group" id="addonFreeGroup"></div>
+      </div>
+    </div>
+
+    <!-- STEP 7: review -->
+    <div class="step" data-step="7">
+      <div class="step-eyebrow">STEP 08</div>
+      <div class="step-title">確認預約內容</div>
+
+      <div class="pass">
+        <div class="pass-top">
+          <div class="pass-route">
+            <div>
+              <div class="airport" id="pass-from">—</div>
+              <div class="sub">上車 PICK-UP</div>
+            </div>
+            <div class="plane">✈</div>
+            <div class="dest">
+              <div class="airport" id="pass-to">—</div>
+              <div class="sub">下車 DROP-OFF</div>
+            </div>
+          </div>
+          <div class="pass-grid">
+            <div class="pass-item"><div class="k">PASSENGER 乘客</div><div class="v" id="pass-name">—</div></div>
+            <div class="pass-item"><div class="k">CONTACT 電話</div><div class="v mono" id="pass-phone">—</div></div>
+            <div class="pass-item"><div class="k">DATE 日期</div><div class="v mono" id="pass-date">—</div></div>
+            <div class="pass-item"><div class="k">TIME 時間</div><div class="v mono" id="pass-time">—</div></div>
+            <div class="pass-item"><div class="k">VEHICLE 車輛</div><div class="v" id="pass-vehicle">—</div></div>
+            <div class="pass-item"><div class="k">PAX 人數</div><div class="v mono" id="pass-pax">—</div></div>
+            <div class="pass-item full"><div class="k">BAGGAGE 行李</div><div class="v" id="pass-baggage">—</div></div>
+            <div class="pass-item full"><div class="k">ADD-ONS 附加服務</div><div class="v" id="pass-addons">—</div></div>
+          </div>
+        </div>
+        <div class="pass-tear"></div>
+        <div class="pass-bottom" style="justify-content:center;">
+          <div class="barcode"></div>
+        </div>
+      </div>
+
+      <div class="send-row">
+        <button class="btn-line" onclick="sendToLine()"><span>📩</span> 一鍵傳送到 LINE</button>
+        <button class="btn-copy" onclick="copyText()">複製預約內容</button>
+      </div>
+      <div class="toast" id="toast">已複製到剪貼簿</div>
+      <div class="note">實際車資將由客服人員確認後回覆。<br>點擊「傳送到 LINE」將開啟 LINE 分享視窗，選擇聊天對象送出。</div>
+    </div>
+
+  </div>
+
+  <div class="nav-row">
+    <button class="btn-ghost" id="prevBtn" onclick="prevStep()">上一步</button>
+    <button class="btn-primary" id="nextBtn" onclick="nextStep()">下一步</button>
+  </div>
+
+</div>
+
+<script>
+  const STEP_NAMES = ["聯絡資訊","日期時間","上車地點","下車地點","人數行李","車輛選擇","附加服務","確認送出"];
+  const TOTAL_STEPS = STEP_NAMES.length;
+  let currentStep = 0;
+
+  // ---------- full Taiwan districts ----------
+  const DISTRICTS = {
+    "台北市": ["中正區","大同區","中山區","松山區","大安區","萬華區","信義區","士林區","北投區","內湖區","南港區","文山區"],
+    "新北市": ["板橋區","三重區","中和區","永和區","新莊區","新店區","樹林區","鶯歌區","三峽區","淡水區","汐止區","瑞芳區","土城區","蘆洲區","五股區","泰山區","林口區","深坑區","石碇區","坪林區","三芝區","石門區","八里區","平溪區","雙溪區","貢寮區","金山區","萬里區","烏來區"],
+    "桃園市": ["桃園區","中壢區","大溪區","楊梅區","蘆竹區","大園區","龜山區","八德區","龍潭區","平鎮區","新屋區","觀音區","復興區"],
+    "台中市": ["中區","東區","南區","西區","北區","北屯區","西屯區","南屯區","太平區","大里區","霧峰區","烏日區","豐原區","后里區","石岡區","東勢區","和平區","新社區","潭子區","大雅區","神岡區","大肚區","沙鹿區","龍井區","梧棲區","清水區","大甲區","外埔區","大安區"],
+    "台南市": ["中西區","東區","南區","北區","安平區","安南區","永康區","歸仁區","新化區","左鎮區","玉井區","楠西區","南化區","仁德區","關廟區","龍崎區","官田區","麻豆區","佳里區","西港區","七股區","將軍區","學甲區","北門區","新營區","後壁區","白河區","東山區","六甲區","下營區","柳營區","鹽水區","善化區","大內區","山上區","新市區","安定區"],
+    "高雄市": ["新興區","前金區","苓雅區","鹽埕區","鼓山區","旗津區","前鎮區","三民區","楠梓區","小港區","左營區","仁武區","大社區","岡山區","路竹區","阿蓮區","田寮區","燕巢區","橋頭區","梓官區","彌陀區","永安區","湖內區","鳳山區","大寮區","林園區","鳥松區","大樹區","旗山區","美濃區","六龜區","內門區","杉林區","甲仙區","桃源區","那瑪夏區","茂林區","茄萣區"],
+    "基隆市": ["仁愛區","信義區","中正區","中山區","安樂區","暖暖區","七堵區"],
+    "新竹市": ["東區","北區","香山區"],
+    "新竹縣": ["竹北市","竹東鎮","新埔鎮","關西鎮","湖口鄉","新豐鄉","芎林鄉","橫山鄉","北埔鄉","寶山鄉","峨眉鄉","尖石鄉","五峰鄉"],
+    "苗栗縣": ["苗栗市","苑裡鎮","通霄鎮","竹南鎮","頭份市","後龍鎮","卓蘭鎮","大湖鄉","公館鄉","銅鑼鄉","南庄鄉","頭屋鄉","三義鄉","西湖鄉","造橋鄉","三灣鄉","獅潭鄉","泰安鄉"],
+    "彰化縣": ["彰化市","鹿港鎮","和美鎮","線西鄉","伸港鄉","福興鄉","秀水鄉","花壇鄉","芬園鄉","員林市","溪湖鎮","田中鎮","大村鄉","埔鹽鄉","埔心鄉","永靖鄉","社頭鄉","二水鄉","北斗鎮","二林鎮","田尾鄉","埤頭鄉","芳苑鄉","大城鄉","竹塘鄉","溪州鄉"],
+    "南投縣": ["南投市","埔里鎮","草屯鎮","竹山鎮","集集鎮","名間鄉","鹿谷鄉","中寮鄉","魚池鄉","國姓鄉","水里鄉","信義鄉","仁愛鄉"],
+    "雲林縣": ["斗六市","斗南鎮","虎尾鎮","西螺鎮","土庫鎮","北港鎮","古坑鄉","大埤鄉","莿桐鄉","林內鄉","二崙鄉","崙背鄉","麥寮鄉","東勢鄉","褒忠鄉","台西鄉","元長鄉","四湖鄉","口湖鄉","水林鄉"],
+    "嘉義市": ["東區","西區"],
+    "嘉義縣": ["太保市","朴子市","布袋鎮","大林鎮","民雄鄉","溪口鄉","新港鄉","六腳鄉","東石鄉","義竹鄉","鹿草鄉","水上鄉","中埔鄉","竹崎鄉","梅山鄉","番路鄉","大埔鄉","阿里山鄉"],
+    "屏東縣": ["屏東市","潮州鎮","東港鎮","恆春鎮","萬丹鄉","長治鄉","麟洛鄉","九如鄉","里港鄉","鹽埔鄉","高樹鄉","萬巒鄉","內埔鄉","竹田鄉","新埤鄉","枋寮鄉","新園鄉","崁頂鄉","林邊鄉","南州鄉","佳冬鄉","琉球鄉","車城鄉","滿州鄉","枋山鄉","三地門鄉","霧台鄉","瑪家鄉","泰武鄉","來義鄉","春日鄉","獅子鄉","牡丹鄉"],
+    "宜蘭縣": ["宜蘭市","羅東鎮","蘇澳鎮","頭城鎮","礁溪鄉","壯圍鄉","員山鄉","冬山鄉","五結鄉","三星鄉","大同鄉","南澳鄉"],
+    "花蓮縣": ["花蓮市","鳳林鎮","玉里鎮","新城鄉","吉安鄉","壽豐鄉","光復鄉","豐濱鄉","瑞穗鄉","富里鄉","秀林鄉","萬榮鄉","卓溪鄉"],
+    "台東縣": ["台東市","成功鎮","關山鎮","卑南鄉","大武鄉","太麻里鄉","東河鄉","長濱鄉","鹿野鄉","池上鄉","綠島鄉","蘭嶼鄉","延平鄉","海端鄉","達仁鄉","金峰鄉"],
+    "澎湖縣": ["馬公市","湖西鄉","白沙鄉","西嶼鄉","望安鄉","七美鄉"],
+    "金門縣": ["金城鎮","金湖鎮","金沙鎮","金寧鄉","烈嶼鄉","烏坵鄉"],
+    "連江縣": ["南竿鄉","北竿鄉","莒光鄉","東引鄉"]
+  };
+  const LANDMARKS = {
+    "中正區":["台北車站","總統府","中正紀念堂","台北賓館"],
+    "大安區":["大安森林公園","忠孝復興商圈","台北教育大學"],
+    "信義區":["台北101","市政府","信義威秀","象山步道"],
+    "松山區":["松山機場","饒河街觀光夜市","南京三民"],
+    "中山區":["中山站商圈","晶華酒店","花博公園","林安泰古厝"],
+    "萬華區":["西門町","龍山寺","艋舺公園","剝皮寮歷史街區"],
+    "士林區":["士林夜市","故宮博物院","天母商圈","芝山岩"],
+    "北投區":["北投溫泉區","關渡宮","北投公園","地熱谷"],
+    "內湖區":["內湖科技園區","大湖公園","美麗華百樂園"],
+    "南港區":["南港展覽館","南港車站","中研院"],
+    "文山區":["政治大學","動物園站","貓空纜車","景美夜市"],
+    "大同區":["大稻埕","迪化街","雙連站","保安宮"],
+    "板橋區":["板橋車站","新板特區","大遠百","林家花園"],
+    "新莊區":["新莊副都心","輔仁大學","新泰路商圈"],
+    "三重區":["三重站","重新橋商圈","集美街夜市"],
+    "中和區":["環球購物中心","中和站","華夏科大"],
+    "永和區":["樂華夜市","永和站","中興街商圈"],
+    "新店區":["新店碧潭","新店站","裕隆城","小粗坑古道"],
+    "樹林區":["樹林火車站","樹林夜市"],
+    "鶯歌區":["鶯歌老街","陶瓷博物館"],
+    "三峽區":["三峽老街","三峽祖師廟","大板根森林"],
+    "淡水區":["淡水老街","淡水漁人碼頭","紅毛城","真理大學"],
+    "汐止區":["汐止火車站","遠雄之星","汐止科技園區"],
+    "瑞芳區":["九份老街","黃金瀑布","水湳洞"],
+    "土城區":["土城桐花公園","承天禪寺"],
+    "蘆洲區":["蘆洲夜市","蘆洲站"],
+    "五股區":["觀音山","五股濕地"],
+    "泰山區":["明志科大","泰山娃娃國"],
+    "林口區":["三井Outlet","林口長庚","竹林山寺"],
+    "深坑區":["深坑老街","豆腐街"],
+    "石碇區":["石碇老街","千島湖"],
+    "坪林區":["坪林茶業博物館","北勢溪自行車道"],
+    "三芝區":["三芝櫻花大道","飛碟屋"],
+    "石門區":["石門風力發電站","富貴角燈塔"],
+    "八里區":["八里左岸","十三行博物館"],
+    "平溪區":["平溪老街","十分瀑布","天燈廣場"],
+    "雙溪區":["雙溪老街"],
+    "貢寮區":["福隆海水浴場","鹽寮龍門海洋公園"],
+    "金山區":["金山老街","朱銘美術館"],
+    "萬里區":["野柳地質公園","翡翠灣"],
+    "烏來區":["烏來老街","烏來瀑布","烏來雲仙樂園"],
+    "仁愛區":["廟口夜市","基隆港"],
+    "安樂區":["情人湖公園"],
+    "暖暖區":["暖暖親水公園"],
+    "七堵區":["七堵鐵道公園"],
+    "桃園區":["桃園火車站","桃園藝文特區","中原夜市"],
+    "中壢區":["中壢火車站","中央大學","SOGO中壢店"],
+    "蘆竹區":["南崁商圈","華亞科技園區","蘆竹交流道"],
+    "大園區":["桃園國際機場","許厝港濕地"],
+    "龜山區":["長庚醫院林口總院","龜山工業區","華亞科技園區"],
+    "八德區":["八德埤塘公園","大湳市場"],
+    "龍潭區":["小人國主題樂園","龍潭大池"],
+    "平鎮區":["平鎮環南路商圈"],
+    "楊梅區":["楊梅高山頂古道","富岡老街"],
+    "新屋區":["新屋綠色隧道","永安漁港"],
+    "大溪區":["大溪老街","大溪橋","慈湖"],
+    "觀音區":["白沙岬燈塔","觀音蓮花園"],
+    "復興區":["拉拉山","小烏來天空步道"],
+    "東區":["新竹城隍廟","清華大學"],
+    "香山區":["南寮漁港","香山濕地"],
+    "竹北市":["新竹高鐵站","縣治二期商圈"],
+    "竹東鎮":["內灣老街","竹東軟橋彩繪村"],
+    "關西鎮":["東安古橋","關西老街"],
+    "湖口鄉":["湖口老街"],
+    "新豐鄉":["新豐紅樹林"],
+    "尖石鄉":["司馬庫斯","那羅花徑"],
+    "五峰鄉":["清泉部落","張學良故居"],
+    "苗栗市":["貓裏喵親子公園","苗栗火車站"],
+    "竹南鎮":["竹南蛇窯"],
+    "頭份市":["尚順育樂世界"],
+    "三義鄉":["三義木雕老街","勝興車站","龍騰斷橋"],
+    "苑裡鎮":["苑裡藺草文化館","華陶窯"],
+    "通霄鎮":["通霄海水浴場","飛牛牧場"],
+    "南庄鄉":["南庄老街","向天湖"],
+    "泰安鄉":["泰安溫泉","雪霸農場"],
+    "中區":["台中州廳","宮原眼科"],
+    "西屯區":["逢甲夜市","台中國家歌劇院","七期重劃區"],
+    "南屯區":["彩虹眷村","文心森林公園"],
+    "北屯區":["新社古堡","廍子公園"],
+    "西區":["審計新村","台中公園"],
+    "太平區":["頭汴坑步道"],
+    "大里區":["大里杙文化館"],
+    "霧峰區":["霧峰林家花園","921地震教育園區"],
+    "烏日區":["高鐵台中站"],
+    "豐原區":["豐原車站","廟東夜市"],
+    "后里區":["麗寶樂園","后里花海"],
+    "外埔區":["中社觀光花市"],
+    "大甲區":["大甲鎮瀾宮","鐵砧山"],
+    "清水區":["高美濕地","清水鬼洞"],
+    "梧棲區":["梧棲觀光漁港"],
+    "沙鹿區":["靜宜大學"],
+    "龍井區":["東海大學路思義教堂"],
+    "東勢區":["東勢林場"],
+    "新社區":["新社花海","新社古堡"],
+    "和平區":["谷關溫泉","梨山"],
+    "彰化市":["八卦山大佛","彰化扇形車庫"],
+    "鹿港鎮":["鹿港老街","鹿港天后宮","鹿港龍山寺"],
+    "溪湖鎮":["溪湖糖廠"],
+    "田尾鄉":["田尾公路花園"],
+    "二林鎮":["台灣氣球博物館"],
+    "芳苑鄉":["芳苑普天宮","漁火節"],
+    "南投市":["南投紫南宮"],
+    "埔里鎮":["埔里酒廠","紙教堂","地理中心碑"],
+    "草屯鎮":["九九峰"],
+    "竹山鎮":["溪頭妖怪村","杉林溪"],
+    "魚池鄉":["日月潭","向山遊客中心","九族文化村"],
+    "仁愛鄉":["清境農場","合歡山","廬山溫泉"],
+    "水里鄉":["水里蛇窯"],
+    "集集鎮":["集集車站","集集綠色隧道"],
+    "信義鄉":["東埔溫泉","梅子夢工廠"],
+    "斗六市":["雲林故事館"],
+    "古坑鄉":["劍湖山世界","古坑咖啡大街"],
+    "北港鎮":["北港朝天宮"],
+    "西螺鎮":["西螺大橋","西螺老街"],
+    "太保市":["故宮南院","高鐵嘉義站"],
+    "朴子市":["朴子配天宮"],
+    "布袋鎮":["布袋觀光漁港","高跟鞋教堂"],
+    "阿里山鄉":["阿里山國家森林遊樂區","奮起湖老街"],
+    "竹崎鄉":["獨立山"],
+    "梅山鄉":["瑞里風景區","太平雲梯"],
+    "中西區":["赤崁樓","神農街","國華街小吃"],
+    "安平區":["安平古堡","安平樹屋","安平老街"],
+    "永康區":["永康商圈","成大醫院永康院區"],
+    "北區":["台南公園","文化中心"],
+    "安南區":["四草綠色隧道","台江國家公園"],
+    "官田區":["烏山頭水庫"],
+    "麻豆區":["麻豆代天府"],
+    "佳里區":["蕭壠文化園區"],
+    "新營區":["新營鐵支路公園"],
+    "白河區":["白河蓮花節","關子嶺溫泉"],
+    "楠西區":["梅嶺風景區"],
+    "左鎮區":["草山月世界"],
+    "新興區":["六合夜市","高雄文學館"],
+    "苓雅區":["高雄市政府","文化中心"],
+    "鹽埕區":["駁二藝術特區","鹽埕老街"],
+    "鼓山區":["西子灣","打狗英國領事館"],
+    "旗津區":["旗津海岸公園","旗津老街"],
+    "前鎮區":["高雄展覽館","夢時代購物中心"],
+    "三民區":["科工館","高雄後驛"],
+    "楠梓區":["楠梓加工出口區"],
+    "左營區":["高鐵左營站","蓮池潭","春秋閣"],
+    "鳳山區":["鳳山車站","衛武營國家藝術文化中心"],
+    "大寮區":["大寮運動公園"],
+    "岡山區":["岡山老街","岡山羊肉爐"],
+    "路竹區":["路科園區"],
+    "橋頭區":["橋頭糖廠"],
+    "阿蓮區":["光德寺"],
+    "永安區":["高雄永安濕地"],
+    "湖內區":["湖內慈濟宮"],
+    "茄萣區":["情人碼頭","茄萣濕地"],
+    "旗山區":["旗山老街","旗山糖廠"],
+    "美濃區":["美濃客家文物館","美濃湖"],
+    "六龜區":["六龜彩蝶谷","不老溫泉"],
+    "桃源區":["寶來溫泉"],
+    "田寮區":["月世界"],
+    "屏東市":["屏東車站","勝利星村","屏東夜市"],
+    "潮州鎮":["潮州老街"],
+    "東港鎮":["東港黑鮪魚觀光季","東港漁港"],
+    "恆春鎮":["恆春古城","南灣海水浴場"],
+    "萬丹鄉":["萬丹社皮綜合公園"],
+    "琉球鄉":["小琉球","花瓶石","美人洞"],
+    "車城鄉":["福安宮","四重溪溫泉"],
+    "滿州鄉":["港口吊橋","佳樂水"],
+    "牡丹鄉":["牡丹水庫","石門古戰場"],
+    "三地門鄉":["三地門文化館","蜻蜓雅築"],
+    "霧台鄉":["霧台部落","神山愛玉"],
+    "宜蘭市":["宜蘭火車站","幾米公園","宜蘭設治紀念館"],
+    "羅東鎮":["羅東夜市","羅東林業文化園區"],
+    "礁溪鄉":["礁溪溫泉","湯圍溝公園"],
+    "頭城鎮":["烏石港","頭城老街","外澳飛行傘"],
+    "蘇澳鎮":["蘇澳冷泉","南方澳漁港"],
+    "冬山鄉":["國立傳統藝術中心","梅花湖"],
+    "五結鄉":["利澤簡老街","傳藝中心"],
+    "壯圍鄉":["壯圍沙丘旅遊服務園區"],
+    "員山鄉":["員山機堡","望龍埤"],
+    "南澳鄉":["南澳神秘湖","朝陽漁港"],
+    "花蓮市":["花蓮火車站","東大門夜市","松園別館"],
+    "新城鄉":["太魯閣國家公園","七星潭"],
+    "吉安鄉":["吉安慶修院","知卡宣公園"],
+    "壽豐鄉":["鯉魚潭","雲山水"],
+    "鳳林鎮":["鳳林客家文物館"],
+    "光復鄉":["花蓮糖廠","大農大富平地森林園區"],
+    "瑞穗鄉":["瑞穗溫泉","瑞穗牧場"],
+    "玉里鎮":["玉里神社","赤柯山"],
+    "豐濱鄉":["石梯坪","靜浦"],
+    "秀林鄉":["太魯閣峽谷","砂卡礑步道"],
+    "台東市":["台東火車站","鐵花村","台東森林公園"],
+    "卑南鄉":["初鹿牧場","台灣史前文化博物館"],
+    "鹿野鄉":["鹿野高台熱氣球嘉年華"],
+    "池上鄉":["池上伯朗大道","池上飯包文化故事館"],
+    "成功鎮":["三仙台","成功漁港"],
+    "長濱鄉":["八仙洞","長濱金剛大道"],
+    "太麻里鄉":["太麻里金針山"],
+    "大武鄉":["大武漁港"],
+    "綠島鄉":["綠島朝日溫泉","柚子湖"],
+    "蘭嶼鄉":["蘭嶼雙獅岩","紅頭部落"],
+    "海端鄉":["向陽森林遊樂區"],
+    "延平鄉":["紅葉溫泉"],
+    "馬公市":["澎湖天后宮","西瀛虹橋"],
+    "湖西鄉":["奎壁山摩西分海"],
+    "白沙鄉":["通樑古榕","跨海大橋"],
+    "西嶼鄉":["漁翁島燈塔","二崁聚落"],
+    "金城鎮":["金門總兵署","莒光樓"],
+    "金湖鎮":["金湖太湖"],
+    "金沙鎮":["金沙陽翟老街"],
+    "南竿鄉":["馬祖天后宮","北海坑道"]
+  };
+
+  const VEHICLES = {
+    "五人座轎車": { desc:"標準轎車・小車・適合 1-3 人", tier:"小車" },
+    "五人座休旅車": { desc:"休旅車・小車・適合 1-4 人＋較多行李", tier:"小車" },
+    "8/9人座商務車": { desc:"商務車・大車・適合團體或大量行李", tier:"大車" }
+  };
+
+  const LUGGAGE_SIZES = [
+    "20吋(登機箱)",
+    "24吋",
+    "28吋","28吋胖胖箱",
+    "29吋","29吋胖胖箱",
+    "30吋","30吋胖胖箱",
+    "32吋以上/特殊大件","32吋以上胖胖箱"
+  ];
+
+  const ADDONS_STEPPER = [
+    { id:"booster", name:"增高墊", price:200 },
+    { id:"carseat", name:"安全座椅", price:200 }
+  ];
+  const ADDONS_PAID = [];
+  const ADDONS_FREE = [
+    { id:"nonsmoking", name:"無菸車" },
+    { id:"receipt", name:"索取收據" },
+    { id:"pet", name:"寵物友善" }
+  ];
+
+  const formData = {
+    name:"", phone:"", date:"", time:"",
+    pCity:"", pDistrict:"", pLandmark:"", pAddress:"",
+    dCity:"", dDistrict:"", dLandmark:"", dAddress:"",
+    pax:"", luggage:{},
+    vehicleType:"", addons:{}, addonQty:{}, price:0
+  };
+  LUGGAGE_SIZES.forEach(s=>formData.luggage[s]=0);
+  ADDONS_PAID.concat(ADDONS_FREE).forEach(a=>formData.addons[a.id]=false);
+  ADDONS_STEPPER.forEach(a=>formData.addonQty[a.id]=0);
+
+  const track = document.getElementById('progressTrack');
+  for(let i=0;i<TOTAL_STEPS;i++){
+    const seg = document.createElement('div');
+    seg.className = 'progress-seg';
+    seg.innerHTML = '<i></i>';
+    track.appendChild(seg);
+  }
+  function updateProgress(){
+    track.querySelectorAll('.progress-seg i').forEach((s,i)=>{ s.style.width = i <= currentStep ? '100%' : '0%'; });
+    document.getElementById('stepIndex').textContent = String(currentStep+1).padStart(2,'0');
+    document.getElementById('stepName').textContent = STEP_NAMES[currentStep];
+  }
+  function showStep(i){
+    document.querySelectorAll('.step').forEach(s=>s.classList.remove('active'));
+    document.querySelector('.step[data-step="'+i+'"]').classList.add('active');
+    document.getElementById('prevBtn').classList.toggle('hidden', i===0);
+    document.getElementById('nextBtn').style.display = i === TOTAL_STEPS-1 ? 'none' : 'block';
+    updateProgress();
+  }
+
+  const paxSelect = document.getElementById('f-pax');
+  for(let i=1;i<=9;i++){
+    const opt = document.createElement('option');
+    opt.value = i; opt.textContent = i+' 人';
+    paxSelect.appendChild(opt);
+  }
+
+  function buildLocationPicker(container, prefix){
+    container.innerHTML =
+      '<div class="field"><label>縣市</label>' +
+        '<select id="'+prefix+'-city"><option value="">請選擇縣市</option>' +
+          Object.keys(DISTRICTS).map(c=>'<option value="'+c+'">'+c+'</option>').join('') +
+        '</select></div>' +
+      '<div class="field"><label>行政區</label><select id="'+prefix+'-district"><option value="">請先選擇縣市</option></select></div>' +
+      '<div class="field"><label>地標／地名（可從清單選擇或自行輸入）</label>' +
+        '<input type="text" id="'+prefix+'-landmark" list="'+prefix+'-landmarkList" placeholder="例如：台北車站">' +
+        '<datalist id="'+prefix+'-landmarkList"></datalist></div>' +
+      '<div class="field" style="margin-bottom:0;"><label>詳細地址（選填）</label>' +
+        '<input type="text" id="'+prefix+'-address" placeholder="例如：忠孝東路四段 1 號"></div>';
+
+    const citySel = document.getElementById(prefix+'-city');
+    const distSel = document.getElementById(prefix+'-district');
+    const landInput = document.getElementById(prefix+'-landmark');
+    const landList = document.getElementById(prefix+'-landmarkList');
+
+    citySel.addEventListener('change', ()=>{
+      distSel.innerHTML = '<option value="">請選擇行政區</option>' + (DISTRICTS[citySel.value]||[]).map(d=>'<option value="'+d+'">'+d+'</option>').join('');
+      landList.innerHTML = '';
+    });
+    distSel.addEventListener('change', ()=>{
+      const opts = (LANDMARKS[distSel.value]||[]).filter(Boolean);
+      landList.innerHTML = opts.map(l=>'<option value="'+l+'"></option>').join('');
+    });
+  }
+  buildLocationPicker(document.getElementById('pickupFields'), 'p');
+  buildLocationPicker(document.getElementById('dropoffFields'), 'd');
+
+  const lugGroup = document.getElementById('luggageStepperGroup');
+  LUGGAGE_SIZES.forEach(size=>{
+    const row = document.createElement('div');
+    row.className = 'lug-row';
+    row.dataset.size = size;
+    row.innerHTML =
+      '<div class="lug-name">'+size+'</div>' +
+      '<div class="lug-stepper">' +
+        '<button type="button" class="lug-btn" data-action="minus">−</button>' +
+        '<div class="lug-count">0</div>' +
+        '<button type="button" class="lug-btn" data-action="plus">＋</button>' +
+      '</div>';
+    lugGroup.appendChild(row);
+  });
+  lugGroup.addEventListener('click', e=>{
+    const btn = e.target.closest('.lug-btn');
+    if(!btn) return;
+    const row = btn.closest('.lug-row');
+    const size = row.dataset.size;
+    let val = formData.luggage[size] || 0;
+    if(btn.dataset.action === 'plus') val++;
+    else val = Math.max(0, val-1);
+    formData.luggage[size] = val;
+    row.querySelector('.lug-count').textContent = val;
+    row.classList.toggle('active', val>0);
+  });
+
+  const vehicleTypeGroup = document.getElementById('vehicleTypeGroup');
+  Object.keys(VEHICLES).forEach(type=>{
+    const div = document.createElement('div');
+    div.className = 'vehicle-card';
+    div.dataset.type = type;
+    div.innerHTML = '<div><div class="vname">'+type+'</div><div class="vdesc">'+VEHICLES[type].desc+'</div></div>';
+    div.addEventListener('click', ()=>selectVehicleType(type));
+    vehicleTypeGroup.appendChild(div);
+  });
+  function selectVehicleType(type){
+    formData.vehicleType = type;
+    document.querySelectorAll('.vehicle-card').forEach(c=>c.classList.toggle('selected', c.dataset.type===type));
+  }
+
+  const addonStepperGroup = document.getElementById('addonStepperGroup');
+  ADDONS_STEPPER.forEach(a=>{
+    const row = document.createElement('div');
+    row.className = 'lug-row';
+    row.dataset.id = a.id;
+    row.innerHTML =
+      '<div class="lug-name">'+a.name+'（NT$'+a.price+'／個）</div>' +
+      '<div class="lug-stepper">' +
+        '<button type="button" class="lug-btn" data-action="minus">−</button>' +
+        '<div class="lug-count">0</div>' +
+        '<button type="button" class="lug-btn" data-action="plus">＋</button>' +
+      '</div>';
+    addonStepperGroup.appendChild(row);
+  });
+  addonStepperGroup.addEventListener('click', e=>{
+    const btn = e.target.closest('.lug-btn');
+    if(!btn) return;
+    const row = btn.closest('.lug-row');
+    const id = row.dataset.id;
+    let val = formData.addonQty[id] || 0;
+    if(btn.dataset.action === 'plus') val++;
+    else val = Math.max(0, val-1);
+    formData.addonQty[id] = val;
+    row.querySelector('.lug-count').textContent = val;
+    row.classList.toggle('active', val>0);
+  });
+
+  const addonFreeGroup = document.getElementById('addonFreeGroup');
+  ADDONS_FREE.forEach(a=>{
+    const pill = document.createElement('div');
+    pill.className = 'pill';
+    pill.dataset.id = a.id;
+    pill.textContent = a.name;
+    addonFreeGroup.appendChild(pill);
+  });
+  function toggleAddon(e){
+    const pill = e.target.closest('.pill');
+    if(!pill) return;
+    const id = pill.dataset.id;
+    formData.addons[id] = !formData.addons[id];
+    pill.classList.toggle('selected', formData.addons[id]);
+  }
+  addonFreeGroup.addEventListener('click', toggleAddon);
+
+  function addonsPaidTotal(){
+    const stepperTotal = ADDONS_STEPPER.reduce((sum,a)=>sum+(formData.addonQty[a.id]||0)*a.price, 0);
+    const toggleTotal = ADDONS_PAID.filter(a=>formData.addons[a.id]).reduce((sum,a)=>sum+a.price,0);
+    return stepperTotal + toggleTotal;
+  }
+  function addonsText(){
+    const parts = [];
+    ADDONS_STEPPER.forEach(a=>{
+      const qty = formData.addonQty[a.id]||0;
+      if(qty>0) parts.push(a.name+' x'+qty+'(+'+(qty*a.price)+')');
+    });
+    ADDONS_PAID.concat(ADDONS_FREE).filter(a=>formData.addons[a.id]).forEach(a=>{
+      const paid = ADDONS_PAID.find(p=>p.id===a.id);
+      parts.push(paid ? a.name+'(+'+paid.price+')' : a.name);
+    });
+    return parts.length ? parts.join('、') : '無';
+  }
+
+  function showError(step, show){
+    const el = document.getElementById('err-'+step);
+    if(el) el.classList.toggle('show', show);
+  }
+  function collectLocation(prefix){
+    formData[prefix+'City'] = document.getElementById(prefix+'-city') ? document.getElementById(prefix+'-city').value : '';
+    formData[prefix+'District'] = document.getElementById(prefix+'-district') ? document.getElementById(prefix+'-district').value : '';
+    formData[prefix+'Landmark'] = document.getElementById(prefix+'-landmark') ? document.getElementById(prefix+'-landmark').value.trim() : '';
+    formData[prefix+'Address'] = document.getElementById(prefix+'-address') ? document.getElementById(prefix+'-address').value.trim() : '';
+  }
+
+  function validateStep(step){
+    if(step===0){
+      formData.name = document.getElementById('f-name').value.trim();
+      formData.phone = document.getElementById('f-phone').value.trim();
+      const ok = formData.name.length>0 && formData.phone.replace(/\D/g,'').length>=8;
+      showError(0, !ok); return ok;
+    }
+    if(step===1){
+      formData.date = document.getElementById('f-date').value;
+      formData.time = document.getElementById('f-time').value;
+      const ok = !!formData.date && !!formData.time;
+      showError(1, !ok); return ok;
+    }
+    if(step===2){
+      collectLocation('p');
+      const ok = !!formData.pCity && !!formData.pDistrict && (formData.pLandmark || formData.pAddress);
+      showError(2, !ok); return ok;
+    }
+    if(step===3){
+      collectLocation('d');
+      const ok = !!formData.dCity && !!formData.dDistrict && (formData.dLandmark || formData.dAddress);
+      showError(3, !ok); return ok;
+    }
+    if(step===4){
+      formData.pax = paxSelect.value;
+      const ok = !!formData.pax;
+      showError(4, !ok); return ok;
+    }
+    if(step===5){
+      const ok = !!formData.vehicleType;
+      showError(5, !ok); return ok;
+    }
+    return true;
+  }
+
+  function nextStep(){
+    if(!validateStep(currentStep)) return;
+    if(currentStep < TOTAL_STEPS-1){
+      currentStep++;
+      showStep(currentStep);
+      if(currentStep === TOTAL_STEPS-1) renderSummary();
+    }
+  }
+  function prevStep(){
+    if(currentStep>0){ currentStep--; showStep(currentStep); }
+  }
+
+  function locationText(prefix){
+    const city = formData[prefix+'City'], dist = formData[prefix+'District'];
+    const land = formData[prefix+'Landmark'], addr = formData[prefix+'Address'];
+    return [city, dist, land, addr].filter(Boolean).join(' ');
+  }
+  function luggageText(){
+    const parts = Object.entries(formData.luggage).filter(([,q])=>q>0).map(([s,q])=>s+' x'+q);
+    return parts.length ? parts.join('、') : '無';
+  }
+  function luggageTotal(){
+    return Object.values(formData.luggage).reduce((a,b)=>a+b,0);
+  }
+
+  function renderSummary(){
+    document.getElementById('pass-from').textContent = formData.pCity ? (formData.pCity+formData.pDistrict) : '—';
+    document.getElementById('pass-to').textContent = formData.dCity ? (formData.dCity+formData.dDistrict) : '—';
+
+    document.getElementById('pass-name').textContent = formData.name || '—';
+    document.getElementById('pass-phone').textContent = formData.phone || '—';
+    document.getElementById('pass-date').textContent = formData.date || '—';
+    document.getElementById('pass-time').textContent = formData.time || '—';
+    document.getElementById('pass-vehicle').textContent = formData.vehicleType || '—';
+    document.getElementById('pass-pax').textContent = formData.pax ? formData.pax+' 人' : '—';
+    document.getElementById('pass-baggage').textContent = luggageTotal()+' 件（'+luggageText()+'）';
+    document.getElementById('pass-addons').textContent = addonsText();
+  }
+
+  const VEHICLE_LABELS = {
+    "五人座轎車": "小車（五人座轎車）",
+    "五人座休旅車": "小車（五人座休旅車）",
+    "8/9人座商務車": "大車（七、八、九人座）"
+  };
+  function shortLocation(prefix){
+    const landmark = formData[prefix+'Landmark'];
+    const address = formData[prefix+'Address'];
+    const city = formData[prefix+'City'], dist = formData[prefix+'District'];
+    const detail = [landmark, address].filter(Boolean).join(' ');
+    return [city, dist, detail].filter(Boolean).join('');
+  }
+  function luggageTextSpaced(){
+    const parts = Object.entries(formData.luggage).filter(([,q])=>q>0).map(([s,q])=>{
+      return s.replace(/(\d+)吋/, '$1 吋') + ' × ' + q;
+    });
+    return parts.length ? parts.join('、') : '無';
+  }
+
+  function buildMessage(){
+    const pickupText = shortLocation('p');
+    const dropoffText = shortLocation('d');
+    const vehicleLabel = VEHICLE_LABELS[formData.vehicleType] || formData.vehicleType || '未選擇';
+
+    const lines = [
+      "【交通接駁預約】",
+      "姓名：" + (formData.name || ''),
+      "電話：" + (formData.phone || ''),
+      "用車：" + (formData.date || '') + ' ' + (formData.time || ''),
+      "人數：" + (formData.pax || 1) + " 人 | 行李：" + luggageTotal() + " 件（" + luggageText() + "）",
+      "上車：" + pickupText,
+      "下車：" + dropoffText,
+      "車輛類型：" + vehicleLabel,
+      "附加服務：" + addonsText(),
+      "——————————",
+      "由交通接駁預約系統送出"
+    ];
+
+    return lines.join('\n');
+  }
+
+  function shareViaUrl(text){
+    const url = 'https://line.me/R/share?text=' + encodeURIComponent(text);
+    window.location.href = url;
+  }
+
+  async function sendToLine(){
+    const text = buildMessage();
+    try {
+      if (typeof liff !== 'undefined' && liff.isInClient()) {
+        // sendMessages 需要 LIFF App 開啟 chat_message.write 權限，
+        // 若權限未開啟或尚未登入，會拋出錯誤，此時自動退回分享視窗，避免使用者卡住無法送出
+        await liff.sendMessages([{ type: 'text', text: text }]);
+        liff.closeWindow();
+      } else {
+        shareViaUrl(text);
+      }
+    } catch (err) {
+      console.error("sendMessages 失敗，改用分享視窗", err);
+      shareViaUrl(text);
+    }
+  }
+
+  function copyText(){
+    navigator.clipboard.writeText(buildMessage());
+    const toast = document.getElementById('toast');
+    toast.classList.add('show');
+    setTimeout(()=>toast.classList.remove('show'), 2000);
+  }
+
+  (function init(){
+    if (typeof liff !== 'undefined') {
+      liff.init({ liffId: "2010998101-Tsfn1Q5r" }).catch(err => console.error("LIFF 初始化失敗", err));
+    }
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('f-date').min = today;
+    showStep(0);
+  })();
+
+</script>
+</body>
+</html>
